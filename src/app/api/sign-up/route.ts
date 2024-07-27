@@ -5,7 +5,7 @@ import { sendVerificationEmail } from "@/helpers/sendVerificationEmail";
 
 export async function POST(request: Request) {
     await dbConnect();
-    
+
     try {
         const { username, email, password } = await request.json();
         
@@ -30,19 +30,42 @@ export async function POST(request: Request) {
             isVerified: true
         });
         if (existingUserByEmail) {
-           if(existingUserByEmail.isVerified){
-            return Response.json({
-                success: false,
-                message: "Email already exists"
-            },{status:400})
-           }
-           else{
-            const hashedPassword = await bcrypt.hash(password,10);
-            existingUserByEmail.password = hashedPassword;
-            existingUserByEmail.verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-            existingUserByEmail.verifyCodeExpiry = new Date(Date.now() + 3600000);
-            await existingUserByEmail.save();
-           }
+            if (existingUserByEmail.isVerified) {
+                return new Response(
+                    JSON.stringify({
+                        success: false,
+                        message: "Email already exists"
+                    }),
+                    { status: 400, headers: { 'Content-Type': 'application/json' } }
+                );
+            } else {
+                // Update existing user with new password and verification details
+                const hashedPassword = await bcrypt.hash(password, 10);
+                existingUserByEmail.password = hashedPassword;
+                existingUserByEmail.verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+                existingUserByEmail.verifyCodeExpiry = new Date(Date.now() + 3600000);
+                await existingUserByEmail.save();
+
+                // Optionally resend verification email
+                const emailResponse = await sendVerificationEmail(email, username, existingUserByEmail.verifyCode);
+                if (!emailResponse) {
+                    return new Response(
+                        JSON.stringify({
+                            success: false,
+                            message: "Failed to send verification email"
+                        }),
+                        { status: 500, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+
+                return new Response(
+                    JSON.stringify({
+                        success: true,
+                        message: "Password updated and verification email resent"
+                    }),
+                    { status: 200, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
         }
 
         // Create new user
@@ -57,7 +80,7 @@ export async function POST(request: Request) {
             password: hashedPassword,
             isVerified: false,
             verifyCode,
-            verificationCodeExpiry: expiryDate,
+            verifyCodeExpiry: expiryDate,
             isAcceptingMessages: true,
             messages: []
         });
