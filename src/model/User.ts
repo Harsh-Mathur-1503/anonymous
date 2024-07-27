@@ -26,15 +26,14 @@ export interface User extends Document {
     isVerified: boolean;
     isAcceptingMessages: boolean;
     messages: Message[];
-    provider: 'credentials' | 'google'; // 'credentials' or 'google'
+    provider: string; // 'credentials' or 'google'
 }
 
 const userSchema: Schema<User> = new Schema({
     username: {
         type: String,
         trim: true,
-        unique: true,
-        required: [function() { return this.provider === 'credentials'; }, "Username is required for credentials users"]
+        unique: true
     },
     email: {
         type: String,
@@ -44,7 +43,7 @@ const userSchema: Schema<User> = new Schema({
     },
     password: {
         type: String,
-        required: [function() { return this.provider === 'credentials'; }, "Password is required for credentials users"]
+        required: [function() { return this.provider === 'credentials'; }, "Password is required for credentials users"],
     },
     verifyCode: {
         type: String,
